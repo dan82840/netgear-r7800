@@ -10,7 +10,7 @@ PKG_START_ORDER:=30
 
 include $(INCLUDE_DIR)/local-development.mk
 ifeq ($(DUMP)$(PKG_VERSION),)
-PKG_VERSION:=g7342061
+PKG_VERSION:=gedfa3ed
 endif
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)

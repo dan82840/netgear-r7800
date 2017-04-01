@@ -22,9 +22,6 @@ define Build/Prepare
 	$(CP) ./src/* $(PKG_BUILD_DIR)/
 endef
 
-define Build/Compile
-endef
-
 define Package/zz-dni-streamboost/install
 	install -d -m0755 $(1)/etc/init.d/
 	install -d -m0755 $(1)/etc/appflow/streamboost.d/

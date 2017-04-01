@@ -1750,6 +1750,7 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 	ecm_db_timer_group_t ci_orig_timer_group;
 	struct ecm_classifier_process_response prevalent_pr;
 	int protocol = (int)orig_tuple->dst.protonum;
+	__be16 *layer4hdr = NULL;
 
 	if (protocol == IPPROTO_TCP) {
 		/*
@@ -1760,6 +1761,8 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 			DEBUG_WARN("TCP packet header %p\n", skb);
 			return NF_ACCEPT;
 		}
+
+		layer4hdr = (__be16 *)tcp_hdr;
 
 		/*
 		 * Now extract information, if we have conntrack then use that (which would already be in the tuples)
@@ -1827,6 +1830,8 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 			DEBUG_WARN("Invalid UDP header in skb %p\n", skb);
 			return NF_ACCEPT;
 		}
+
+		layer4hdr = (__be16 *)udp_hdr;
 
 		/*
 		 * Now extract information, if we have conntrack then use that (which would already be in the tuples)
@@ -1998,7 +2003,7 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 		 * GGG TODO The empty list checks should not be needed, mapping_establish_and_ref() should fail out if there is no list anyway.
 		 */
 		DEBUG_TRACE("%p: Create the 'from' interface heirarchy list\n", nci);
-		from_list_first = ecm_interface_heirarchy_construct(feci, from_list, ip_dest_addr, ip_src_addr, 4, protocol, in_dev, is_routed, in_dev, src_node_addr, dest_node_addr);
+		from_list_first = ecm_interface_heirarchy_construct(feci, from_list, ip_dest_addr, ip_src_addr, 4, protocol, in_dev, is_routed, in_dev, src_node_addr, dest_node_addr, layer4hdr);
 		if (from_list_first == ECM_DB_IFACE_HEIRARCHY_MAX) {
 			feci->deref(feci);
 			ecm_db_connection_deref(nci);
@@ -2028,7 +2033,7 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 		}
 
 		DEBUG_TRACE("%p: Create the 'to' interface heirarchy list\n", nci);
-		to_list_first = ecm_interface_heirarchy_construct(feci, to_list, ip_src_addr, ip_dest_addr, 4, protocol, out_dev, is_routed, in_dev, dest_node_addr, src_node_addr);
+		to_list_first = ecm_interface_heirarchy_construct(feci, to_list, ip_src_addr, ip_dest_addr, 4, protocol, out_dev, is_routed, in_dev, dest_node_addr, src_node_addr, layer4hdr);
 		if (to_list_first == ECM_DB_IFACE_HEIRARCHY_MAX) {
 			ecm_db_mapping_deref(src_mi);
 			ecm_db_node_deref(src_ni);
@@ -2070,7 +2075,7 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 		 * GGG TODO The empty list checks should not be needed, mapping_establish_and_ref() should fail out if there is no list anyway.
 		 */
 		DEBUG_TRACE("%p: Create the 'from NAT' interface heirarchy list\n", nci);
-		from_nat_list_first = ecm_interface_heirarchy_construct(feci, from_nat_list, ip_dest_addr, ip_src_addr_nat, 4, protocol, in_dev_nat, is_routed, in_dev_nat, src_node_addr_nat, dest_node_addr_nat);
+		from_nat_list_first = ecm_interface_heirarchy_construct(feci, from_nat_list, ip_dest_addr, ip_src_addr_nat, 4, protocol, in_dev_nat, is_routed, in_dev_nat, src_node_addr_nat, dest_node_addr_nat, layer4hdr);
 		if (from_nat_list_first == ECM_DB_IFACE_HEIRARCHY_MAX) {
 			ecm_db_mapping_deref(dest_mi);
 			ecm_db_node_deref(dest_ni);
@@ -2111,7 +2116,7 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 		}
 
 		DEBUG_TRACE("%p: Create the 'to NAT' interface heirarchy list\n", nci);
-		to_nat_list_first = ecm_interface_heirarchy_construct(feci, to_nat_list, ip_src_addr, ip_dest_addr_nat, 4, protocol, out_dev_nat, is_routed, in_dev, dest_node_addr_nat, src_node_addr_nat);
+		to_nat_list_first = ecm_interface_heirarchy_construct(feci, to_nat_list, ip_src_addr, ip_dest_addr_nat, 4, protocol, out_dev_nat, is_routed, in_dev, dest_node_addr_nat, src_node_addr_nat, layer4hdr);
 		if (to_nat_list_first == ECM_DB_IFACE_HEIRARCHY_MAX) {
 			ecm_db_mapping_deref(src_nat_mi);
 			ecm_db_node_deref(src_nat_ni);
@@ -2287,7 +2292,7 @@ unsigned int ecm_sfe_ported_ipv4_process(struct net_device *out_dev, struct net_
 	 * Do we need to action generation change?
 	 */
 	if (unlikely(ecm_db_connection_regeneration_required_check(ci))) {
-		ecm_sfe_ipv4_connection_regenerate(ci, sender, out_dev, out_dev_nat, in_dev, in_dev_nat);
+		ecm_sfe_ipv4_connection_regenerate(ci, sender, out_dev, out_dev_nat, in_dev, in_dev_nat, layer4hdr);
 	}
 
 	/*

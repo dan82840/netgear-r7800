@@ -44,6 +44,7 @@ boot() {
 	fi
 
 	/sbin/cmdftp restart &
+	/sbin/check_status.sh &
 	rm -f /tmp/boot_status
 	echo "[R7800]***boot done***" > /dev/console
 }

@@ -8,8 +8,8 @@ PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/local-development.mk
 ifeq ($(DUMP)$(PKG_VERSION),)
-PKG_REV:=f893adb
-PKG_VERSION:=gf893adb
+PKG_REV:=f802571
+PKG_VERSION:=gf802571
 endif
 PKG_START_ORDER:=40
 
@@ -30,7 +30,6 @@ define Package/$(PKG_NAME)
   TITLE:=StreamBoost to Netlink interface
   DEPENDS:=+libsbdaemon +hiredis +libevent2-core +libnl-bf +libpthread +tc \
 	+iptables-mod-conntrack-extra +iptables-mod-ipopt \
-	+kmod-ftp-alg +kmod-pptp-alg +kmod-dnih323 \
 	+kmod-sched +kmod-sched-connmark +kmod-ipt-ipopt \
 	+iptables-mod-mark2prio +guest_dhcp
   MAINTAINER:=Nic Costa <ncosta@qca.qualcomm.com>
@@ -58,10 +57,14 @@ define Package/$(PKG_NAME)
 	CONFIG_NF_CONNTRACK=m \
 	CONFIG_NF_CONNTRACK_CHAIN_EVENTS=y \
 	CONFIG_NF_CONNTRACK_EVENTS=y \
+	CONFIG_NF_CONNTRACK_FTP=m \
+	CONFIG_NF_CONNTRACK_H323=m \
 	CONFIG_NF_CONNTRACK_IRC=m \
 	CONFIG_NF_CONNTRACK_MARK=y \
+	CONFIG_NF_CONNTRACK_PPTP=m \
 	CONFIG_NF_CONNTRACK_SIP=m \
-	CONFIG_NF_CT_NETLINK=m
+	CONFIG_NF_CT_NETLINK=m \
+	CONFIG_NF_CT_PROTO_GRE=m
 endef
 
 define Package/$(PKG_NAME)/description

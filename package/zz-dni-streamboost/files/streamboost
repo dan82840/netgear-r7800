@@ -37,7 +37,7 @@ CLOUD_PACKAGES="wopr-db policy-redis p0f-db macoui-db"
 SPINLOCK_TIMEOUT=7
 FSM_VAR="$RUNDIR/streamboost_fsm.state"
 FSM_LOCK="${FSM_VAR}.lck"
-FSM_lock_was_stale=0
+FSM_stale_state=0
 
 FSM_ACTION_NONE=0
 FSM_ACTION_START=1
@@ -69,7 +69,7 @@ ecm_is_installed() {
 
 # this is the control file for the ecm nl classifier module that allows
 # us to disable and enable it by echoing 0 or 1 respectively
-ECM_NL_ENABLED=/sys/devices/system/ecm_classifier_nl/ecm_classifier_nl0/enabled
+ECM_NL_ENABLED=/sys/kernel/debug/ecm/ecm_classifier_nl/enabled
 
 # tests to see if ECM is up and ready to receive commands.
 # returns 0 if ECM is fully up and ready, else 1
@@ -136,19 +136,27 @@ FSM_set_lock_PID() {
 # note that this can fail, so the return code needs to be checked by the caller
 FSM_lock() {
 	local timeout="${1:-$SPINLOCK_TIMEOUT}"
-	local oldpid=$(cat "$FSM_LOCK.pid" 2>/dev/null)
-	FSM_lock_was_stale=0
+	local oldpid
+	FSM_stale_state=0
 	while [ $timeout -gt 0 ]; do
 		mkdir "$FSM_LOCK" 2>/dev/null && {
+			local state=$(cat "$FSM_VAR" 2>/dev/null || echo $FSM_STATE_STOPPED)
+			[ $state -gt $FSM_STATE_MAXSTABLE -a $FSM_state_checked -eq 0 ] && {
+				local instances=$(ps www | grep -v grep | grep $0 | wc -l)
+				[ $instances -lt 3 ] && {
+					$LOGGER Detected stale transitory state
+					FSM_stale_state=1
+				}
+			}
+			FSM_state_checked=1
 			FSM_set_lock_PID
 			return 0
 		}
+		oldpid=$(cat "$FSM_LOCK.pid" 2>/dev/null)
 		[ -e "/proc/$oldpid/maps" ] || {
 			$LOGGER "FSM lock: stale, $$ override attempt"
-			FSM_lock_was_stale=1
 			rmdir "$FSM_LOCK" 2>/dev/null
-			mkdir "$FSM_LOCK" && FSM_set_lock_PID
-			return $?
+			continue
 		}
 		let timeout--
 		sleep 1
@@ -273,16 +281,7 @@ FSM_action() {
 	local state=$(cat "$FSM_VAR" 2>/dev/null || echo $FSM_STATE_STOPPED)
 	local new_state
 
-	[ $state -gt $FSM_STATE_MAXSTABLE -a $FSM_state_checked -eq 0 ] && {
-		local instances=$(ps www | grep -v grep | grep $0 | wc -l)
-		[ $instances -lt 3 ] && {
-			$LOGGER Detected stale transitory state
-			FSM_lock_was_stale=1
-		}
-	}
-	FSM_state_checked=1
-
-	if [ $FSM_lock_was_stale -eq 0 ]; then
+	if [ $FSM_stale_state -eq 0 ]; then
 		new_state=$(FSM_transition_$action $state)
 	else
 		state=$FSM_STATE_RUNNING
@@ -360,7 +359,7 @@ apply_action() {
 	local clear_marks=""
 	local status_all=""
 	local target_all=""
-	local fsm_reply
+	local fsm_reply=$FSM_ACTION_APPROVED
 	shift
 	shift
 
@@ -490,7 +489,6 @@ apply_action() {
 	if [ "$action" = "boot" -o "$action" = "start" -o "$action" = "stop" ]; then
 		net-wall restart
 	fi
-	/etc/init.d/qca-nss-ecm stop; /etc/init.d/qca-nss-ecm start
 	# Bug 50855, this is workaround, we will find a better solution.
 	if [ "$action" = "boot" -o "$action" = "start" ]; then
 		update_fmn
@@ -527,15 +525,19 @@ status_monit() {
 	local retval=$ALL_GOOD
 	status
 	statcount=$?
-	[ "$statcount" -gt 0 -a "$statcount" -lt $STATUS_ALL_DOWN ] && {
-		# Streamboost is partially down
-		if [ $FSM_state -eq $FSM_STATE_STOPPED ]; then
-			retval=$NEED_STOP
-		else
-			retval=$NEED_START
-		fi
-	}
-	local msg="Streamboost: status=$statcount, FSM_state=$(FSM_state_name $FSM_state) ($FSM_state)"
+	if [ $FSM_stale_state -eq 0 ]; then
+		[ "$statcount" -gt 0 -a "$statcount" -lt $STATUS_ALL_DOWN ] && {
+			# Streamboost is partially down
+			if [ $FSM_state -eq $FSM_STATE_STOPPED ]; then
+				retval=$NEED_STOP
+			else
+				retval=$NEED_START
+			fi
+		}
+	else
+		retval=$NEED_RESTART
+	fi
+	local msg="Streamboost: status=$statcount, FSM_state=$(FSM_state_name $FSM_state) ($FSM_state) stale=$FSM_stale_state"
 	echo "$msg"
 	[ "$SB_DISABLE_MONIT" = "yes" ] && retval=$ALL_GOOD
 	[ $retval -ne $ALL_GOOD ] && $LOGGER "$msg"

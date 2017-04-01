@@ -73,7 +73,11 @@ setup_iface() {
 		handle ${PRIO_HANDLE_MAJOR}: \
 		nssprio bands 3
 	[ $? = 0 ] || return $?
-	# interactive for localhost OUTPUT
+	# interactive for localhost OUTPUT.  the target qdisc is not limited
+	# by streamboost and is used for two cases (see iptables rules):
+	#   1. localhost to LAN so the UI is responsive.
+	#   2. localhost to WAN for the bandwidth tester ports only so the
+	#      tester can measure accurately.
 	add_interactive_qdisc ${dev} \
 		"${PRIO_HANDLE_MAJOR}:3" \
 		"${OUTPUT_HANDLE_MAJOR}:" "nsscodel"
@@ -116,7 +120,7 @@ setup_iface() {
 		"${CLASSID_DEFAULT}:" "nsscodel" "set_default"
 	[ $? = 0 ] || return $?
 
-	# localhost class for traffic originating from the router
+	# localhost class for traffic originating from the router to the WAN
 	tc class add dev ${dev} \
 		parent ${SCHROOT_HANDLE_MAJOR}: \
 		classid ${SCHROOT_HANDLE_MAJOR}:${CLASSID_LOCALHOST} \

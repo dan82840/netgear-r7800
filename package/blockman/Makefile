@@ -10,8 +10,8 @@ PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/local-development.mk
 ifeq ($(DUMP)$(PKG_VERSION),)
-PKG_REV:=594cecb
-PKG_VERSION:=g594cecb
+PKG_REV:=31df683
+PKG_VERSION:=g31df683
 endif
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
@@ -44,10 +44,10 @@ MAKE_FLAGS += \
 
 # TABS
 define Package/blockman/install
-	$(INSTALL_DIR) $(1)/etc/appflow/streamboost.d/
+	$(INSTALL_DIR) $(1)/etc/appflow/init.d/
 	$(INSTALL_DIR) $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/blockman $(1)/usr/sbin/
-	$(INSTALL_BIN) ./files/blockman.init $(1)/etc/appflow/streamboost.d/${PKG_START_ORDER}_${PKG_NAME}
+	$(INSTALL_BIN) ./files/blockman.init $(1)/etc/appflow/init.d/
 endef
 
 # NO TABS, NO SPACES
