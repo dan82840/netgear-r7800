@@ -1256,8 +1256,27 @@ enable_qcawifi() {
 		else
 			iwpriv "$ifname" vhtsubfer 1
 			iwpriv "$ifname" vhtsubfee 1
-			iwpriv "$ifname" vhtmubfer 1
-			iwpriv "$ifname" vhtmubfee 1
+
+			# Multi-user MIMO
+			case "$hwmode" in
+			11AC*)
+				config_get mu_mimo "$device" mu_mimo
+				if [ "$mu_mimo" -ne "1" ]; then
+					# Disable Multi-user MIMO
+					iwpriv "$ifname" vhtmubfer 0
+					iwpriv "$ifname" vhtmubfee 0
+				else
+					# Enable Multi-user MIMO
+					iwpriv "$ifname" vhtmubfer 1
+					iwpriv "$ifname" vhtmubfee 1
+				fi
+				;;
+			*)
+				iwpriv "$ifname" vhtmubfer 1
+				iwpriv "$ifname" vhtmubfee 1
+				;;
+			esac
+
 			iwpriv "$ifname" implicitbf 0
 		fi
 
