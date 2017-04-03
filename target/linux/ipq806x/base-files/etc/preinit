@@ -42,6 +42,8 @@ ubinum=`ubinfo -a|grep overlay_volume -B 5 |grep "Volume ID" |awk '{print $5}' |
 mount -t ubifs ubi$ubinum:overlay_volume /tmp/overlay
 mount -o move /tmp/overlay /overlay 2>&-
 if [ "x`cat /firmware_time`" != "x`cat /overlay/.firmware_time`" ]; then
+	crashmtd=`grep crashdump /proc/mtd | awk -F ':' '{print $1}' | awk -F 'd' '{print $2}'`
+	[ "$crashmtd" = "9" ] && flash_erase /dev/mtd$crashmtd 0 0
 	cloud backup
 	ls -d /overlay/* | grep -v hipplay | xargs rm -rf
 	rm -rf /overlay/.*

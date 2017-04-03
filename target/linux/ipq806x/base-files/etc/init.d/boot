@@ -36,10 +36,6 @@ start() {
 	# generate the firewall rule file after loading the configuration data.
 	/usr/sbin/net-wall rule
 
-	# start SIP ALG module
-	/sbin/cmd_sipalg
-
-
 	#Do delete overlay for the first factory mode.
 	if [ "$(/bin/config get factory_mode)" = "1" ] && [ "$(/bin/config get faccalibra)" != "1" ]; then 
 		cloud backup
@@ -59,6 +55,10 @@ start() {
 	grep -q "dev\.nss\.general\.redirect=1" /etc/sysctl.d/qca-nss-ecm.conf || cp /rom/etc/sysctl.d/qca-nss-ecm.conf /etc/sysctl.d/qca-nss-ecm.conf
 	/etc/init.d/watchdog start &
 	load_modules /etc/modules.d/*
+
+	# start SIP ALG module
+	/sbin/cmd_sipalg
+
 	insmod /lib/ufsd/ufsd.ko
 
 	# disable wifi under factory_mode
