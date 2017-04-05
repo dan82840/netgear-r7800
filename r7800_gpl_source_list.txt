@@ -118,8 +118,6 @@ net-wall, 2.0, DNI, Yes
 
 net-cgi, 1.0, DNI, Yes
 
-radardetect, 1.0, DNI, Yes
-
 dni_enet, 1.0, DNI, Yes
 
 noip2, 2.1.9-1, GPL, Yes
@@ -208,7 +206,7 @@ qca-wifi-fw, CNSS.BL.1.0-00453-S-1, Atheros, Yes
 
 qcmbr, 10.4, Atheros, Yes
 
-radardetect, 1, DNI, Yes
+radardetect, 1.0, DNI, Yes
 
 shortcut-fe, 1,Dual BSD/GPL, Yes
 

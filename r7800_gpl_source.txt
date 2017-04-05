@@ -63,6 +63,11 @@ User application
         DNI
         GPL
         Source Code
+[bwestd]
+        bwestd
+        Atheros
+        Atheros
+        Binary
 [blockman]
 		blockman
 		Atheros
@@ -85,6 +90,11 @@ User application
         Binary
 [cape]
         cape
+        Atheros
+        Atheros
+        Binary
+[celes]
+        celes
         Atheros
         Atheros
         Binary
@@ -483,6 +493,16 @@ User application
         http://www.lua.org/ftp/
         GPL
         Source Code
+[luci-app-streamboost]
+        luci-app-streamboost
+        Atheros
+        Atheros
+        Binary
+[luci-theme-steelblue]
+        luci-theme-steelblue
+        Atheros
+        Atheros
+        Binary
 [lvm2]
         LVM2.2.02.91.tgz
         http://sourceware.org/dm/
