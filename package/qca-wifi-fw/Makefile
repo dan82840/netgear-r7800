@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=qca-wifi-fw
-PKG_VERSION:=CNSS.BL.3.0.2-00021-S-1
+PKG_VERSION:=CNSS.BL.3.0.2-00027-S-1
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)$(BUILD_VARIANT)-$(PKG_VERSION).tar.bz2

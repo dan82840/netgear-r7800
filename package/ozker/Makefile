@@ -9,8 +9,8 @@ PKG_START_ORDER:=60
 
 include $(INCLUDE_DIR)/local-development.mk
 ifeq ($(DUMP)$(PKG_VERSION),)
-PKG_REV:=f145251
-PKG_VERSION:=gf145251
+PKG_REV:=125d397
+PKG_VERSION:=g125d397
 endif
 PKG_RELEASE:=2
 

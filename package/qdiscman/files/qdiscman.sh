@@ -62,7 +62,11 @@ setup_iface() {
 		handle ${PRIO_HANDLE_MAJOR}: \
 		prio bands 3 priomap 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
 	[ $? = 0 ] || return $?
-	# interactive for localhost OUTPUT
+	# interactive for localhost OUTPUT.  the target qdisc is not limited
+	# by streamboost and is used for two cases (see iptables rules):
+	#   1. localhost to LAN so the UI is responsive.
+	#   2. localhost to WAN for the bandwidth tester ports only so the
+	#      tester can measure accurately.
 	add_interactive_qdisc ${dev} \
 		"${PRIO_HANDLE_MAJOR}:3" \
 		"${OUTPUT_HANDLE_MAJOR}:"
@@ -175,7 +179,7 @@ setup_iface() {
 		"${CLASSID_DEFAULT}:"
 	[ $? = 0 ] || return $?
 
-	# localhost class for traffic originating from the router
+	# localhost class for traffic originating from the router to the WAN
 	tc class add dev ${dev} \
 		parent ${BF_HANDLE_MAJOR}:${CLASSID_BACKGROUND} \
 		classid ${BF_HANDLE_MAJOR}:${CLASSID_LOCALHOST} \

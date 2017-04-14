@@ -55,7 +55,7 @@ check_for_zombies() {
 default_status() {
 	if [ -r "$PIDFILE" ]; then
 		PID=$(cat $PIDFILE 2>/dev/null)
-		if [ -e /proc/$PID ]; then
+		if [ -e /proc/$PID/maps ]; then
 			check_for_zombies $PID || return 2
 			echo "$DISPLAY_NAME (pid $PID) is running."
 		else

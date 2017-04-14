@@ -313,6 +313,7 @@ if [ -n "$DNI_CONFIG" ]; then
         eval wla_tpscale=\$tpscale_`dniconfig get wla_tpscale`
         wla_wps_ap_setup_locked=`dniconfig get wla_endis_pin`
         eval wla_bf_onoff=\$onoff_`dniconfig get wla_bf`
+        eval wla_mu_mimo_onoff=\$onoff_`dniconfig get wla_mu_mimo`
         wla_bridge=`dniconfig get i_wla_br`
         wla_priority=`dniconfig get i_wla_pri`
         [ -z "$wla_bridge" ] && wla_bridge=$lan_ifname

@@ -93,6 +93,13 @@ menu "Target Images"
 		help
 		  Build a jffs2 root filesystem
 
+	config TARGET_ROOTFS_JFFS2_NAND
+		bool "jffs2 for NAND"
+		default y if USES_JFFS2_NAND
+		depends on !TARGET_ROOTFS_INITRAMFS && USES_JFFS2_NAND
+		help
+		  Build a jffs2 root filesystem for NAND flash
+
 	config TARGET_ROOTFS_SQUASHFS
 		bool "squashfs"
 		default y if USES_SQUASHFS
@@ -227,8 +234,38 @@ menu "Global build settings"
 		bool "Compile the kernel with tracing support"
 		default n
 
+	config KERNEL_DYNAMIC_FTRACE
+		bool "Enable dynamic ftrace"
+		depends on KERNEL_FTRACE
+		default n
+
 	config KERNEL_ENABLE_DEFAULT_TRACERS
 		bool "Trace process context switches and events"
+		depends on KERNEL_FTRACE
+		default n
+
+	config KERNEL_FUNCTION_TRACER
+		bool "Enable function tracer"
+		depends on KERNEL_FTRACE
+		default n
+
+	config KERNEL_FUNCTION_PROFILER
+		bool "Enable function profilier"
+		depends on KERNEL_FUNCTION_TRACER
+		default n
+
+	config KERNEL_FUNCTION_GRAPH_TRACER
+		bool "Enable function graph tracer"
+		depends on KERNEL_FUNCTION_TRACER
+		default n
+
+	config KERNEL_IRQSOFF_TRACER
+		bool "Enable IRQSOFF tracer"
+		depends on KERNEL_FTRACE
+		default n
+
+	config KERNEL_PREEMPT_TRACER
+		bool "Enable PREMPTOFF tracer"
 		depends on KERNEL_FTRACE
 		default n
 
@@ -243,6 +280,19 @@ menu "Global build settings"
 		help
 		  This will compile your kernel and modules with debug information.
 
+	config KERNEL_DEBUG_INFO_REDUCED
+		bool "Reduce debugging information"
+		depends on KERNEL_DEBUG_INFO
+		default y
+
+	config KERNEL_DEBUG_KMEMLEAK
+		bool "Compile the kernel with memory leak detector"
+		default n
+
+	config KERNEL_DEBUG_KMEMLEAK_DEFAULT_OFF
+		bool "Turn kernel memory leak detector off at boot by default"
+		default n
+
 	config KERNEL_DEBUG_LL_UART_NONE
 		bool
 		default n
@@ -255,6 +305,14 @@ menu "Global build settings"
 		select KERNEL_DEBUG_LL_UART_NONE
 		help
 		  ARM low level debugging
+
+	config KERNEL_KPROBES
+		bool "Compile the kernel with kprobes support"
+		default n
+
+	config KERNEL_KEXEC
+		bool "Compile the kernel with kexec supportt"
+		default n
 
 	config KERNEL_EARLY_PRINTK
 		bool "Compile the kernel with early printk"
@@ -289,12 +347,33 @@ menu "Global build settings"
 		bool "Enable printk timestamps"
 		default y
 
+	config KERNEL_SLUB_DEBUG
+		bool
+
+	config KERNEL_SLUB_DEBUG_ON
+		bool
+
+	config KERNEL_SLABINFO
+		select KERNEL_SLUB_DEBUG
+		select KERNEL_SLUB_DEBUG_ON
+		bool "Enable /proc slab debug info"
+
 	config KERNEL_RELAY
 		bool
 
 	config KERNEL_SPARSE
 		bool "Enable sparse check during kernel build"
 		default n
+
+	config KERNEL_SKB_RECYCLER_PREALLOC
+		select KERNEL_SKB_RECYCLE_MAX_PREALLOC_SKBS
+		bool "Enable preallocation of skbs for recycler lists"
+		default n
+
+	config KERNEL_SKB_RECYCLE_MAX_PREALLOC_SKBS
+		depends on KERNEL_SKB_RECYCLER_PREALLOC
+		int "Number of preallocated skbs"
+		default 16384
 
 	comment "Package build options"
 
@@ -449,6 +528,25 @@ menu "Global build settings"
 
 	endchoice
 
+	comment "Security Mitigations"
+
+	config ENABLE_SSP
+		bool "Enable stack protection (-fstack-protector)"
+		default y
+		select SSP_SUPPORT
+		help
+		  If enabled, the packages and libc will be built with
+		  stack protection, a security mitigation that prevents
+		  buffer overflows from being exploitable.
+
+	config ENABLE_RELRO
+		bool "Enable RELRO (-Wl,-z,relro,-z,now)"
+		default y
+		help
+		  If enabled, the packages and libc will be built with read only
+		  relocation entries, preventing exploits from overwriting
+		  sensitive sections in an ELF file that can lead to code execution.
+
 endmenu
 
 menuconfig DEVEL
@@ -465,6 +563,10 @@ menuconfig DEVEL
 
 	config LOCALMIRROR
 		string "Local mirror for source packages" if DEVEL
+		default ""
+
+	config GIT_MIRROR
+		string "Git mirror" if DEVEL
 		default ""
 
 	config AUTOREBUILD

@@ -1382,6 +1382,7 @@ struct ecm_db_iface_instance *ecm_interface_establish_and_ref(struct ecm_front_e
 	 * Extract from the device more type-specific information
 	 */
 	if (dev_type == ARPHRD_ETHER) {
+
 		/*
 		 * Ethernet - but what sub type?
 		 */
@@ -1405,7 +1406,7 @@ struct ecm_db_iface_instance *ecm_interface_establish_and_ref(struct ecm_front_e
 			 * Establish this type of interface
 			 */
 			ii = ecm_interface_vlan_interface_establish(&type_info.vlan, dev_name, dev_interface_num, ae_interface_num, dev_mtu);
-			return ii;
+			goto identifier_update;
 		}
 #endif
 
@@ -1425,7 +1426,7 @@ struct ecm_db_iface_instance *ecm_interface_establish_and_ref(struct ecm_front_e
 			 * Establish this type of interface
 			 */
 			ii = ecm_interface_bridge_interface_establish(&type_info.bridge, dev_name, dev_interface_num, ae_interface_num, dev_mtu);
-			return ii;
+			goto identifier_update;
 		}
 
 #ifdef ECM_INTERFACE_BOND_ENABLE
@@ -1445,7 +1446,7 @@ struct ecm_db_iface_instance *ecm_interface_establish_and_ref(struct ecm_front_e
 			 * Establish this type of interface
 			 */
 			ii = ecm_interface_lag_interface_establish(&type_info.lag, dev_name, dev_interface_num, ae_interface_num, dev_mtu);
-			return ii;
+			goto identifier_update;
 		}
 #endif
 
@@ -1461,6 +1462,17 @@ struct ecm_db_iface_instance *ecm_interface_establish_and_ref(struct ecm_front_e
 		 * Establish this type of interface
 		 */
 		ii = ecm_interface_ethernet_interface_establish(&type_info.ethernet, dev_name, dev_interface_num, ae_interface_num, dev_mtu);
+
+identifier_update:
+		if (ii) {
+			/*
+			 * An interface identifier/ifindex can be change after network restart. Below
+			 * functtion will check interface_identifier present in 'ii' with new dev_interface_num.
+			 * If differ then update new ifindex and update the interface identifier hash table.
+			 */
+			ecm_db_iface_identifier_hash_table_entry_check_and_update(ii, dev_interface_num);
+		}
+
 		return ii;
 	}
 
@@ -1683,7 +1695,7 @@ EXPORT_SYMBOL(ecm_interface_establish_and_ref);
 static uint32_t ecm_interface_multicast_heirarchy_construct_single(struct ecm_front_end_connection_instance *feci, ip_addr_t src_addr,
 								   ip_addr_t dest_addr, struct ecm_db_iface_instance *interface,
 								   struct net_device *given_dest_dev, struct net_device *br_slave_dev,
-								   uint8_t *src_node_addr, bool is_routed)
+								   uint8_t *src_node_addr, bool is_routed, __be16 *layer4hdr)
 {
 	struct ecm_db_iface_instance *to_list_single[ECM_DB_IFACE_HEIRARCHY_MAX];
 	struct ecm_db_iface_instance **ifaces;
@@ -1844,11 +1856,11 @@ static uint32_t ecm_interface_multicast_heirarchy_construct_single(struct ecm_fr
 					if (ECM_IP_ADDR_IS_V4(src_addr)) {
 						next_dev = bond_get_tx_dev(NULL, src_mac_addr, dest_mac_addr,
 									   &src_addr_32, &dest_addr_32,
-									   htons((uint16_t)ETH_P_IP), dest_dev);
+									   htons((uint16_t)ETH_P_IP), dest_dev, layer4hdr);
 					} else {
 						next_dev = bond_get_tx_dev(NULL, src_mac_addr, dest_mac_addr,
 									   src_addr, dest_addr,
-									   htons((uint16_t)ETH_P_IPV6), dest_dev);
+									   htons((uint16_t)ETH_P_IPV6), dest_dev, NULL);
 					}
 
 					if (!(next_dev && netif_carrier_ok(next_dev))) {
@@ -2045,7 +2057,8 @@ int32_t ecm_interface_multicast_heirarchy_construct_routed(struct ecm_front_end_
 								ip_addr_t packet_src_addr,
 								ip_addr_t packet_dest_addr, uint8_t max_if,
 								uint32_t *dst_if_index_base,
-								uint32_t *interface_first_base)
+								uint32_t *interface_first_base,
+								__be16 *layer4hdr)
 {
 	struct ecm_db_iface_instance *to_list_single[ECM_DB_IFACE_HEIRARCHY_MAX];
 	struct ecm_db_iface_instance *ifaces;
@@ -2190,7 +2203,7 @@ int32_t ecm_interface_multicast_heirarchy_construct_routed(struct ecm_front_end_
 				/*
 				 * Construct a single interface heirarchy of a multicast dev.
 				 */
-				ii_cnt = ecm_interface_multicast_heirarchy_construct_single(feci, packet_src_addr, packet_dest_addr, ifaces, dest_dev, mc_br_slave_dev, NULL, true);
+				ii_cnt = ecm_interface_multicast_heirarchy_construct_single(feci, packet_src_addr, packet_dest_addr, ifaces, dest_dev, mc_br_slave_dev, NULL, true, layer4hdr);
 				if (ii_cnt == ECM_DB_IFACE_HEIRARCHY_MAX) {
 
 					/*
@@ -2226,7 +2239,7 @@ int32_t ecm_interface_multicast_heirarchy_construct_routed(struct ecm_front_end_
 			/*
 			 * Construct a single interface heirarchy of a multicast dev.
 			 */
-			ii_cnt = ecm_interface_multicast_heirarchy_construct_single(feci, packet_src_addr, packet_dest_addr, ifaces, dest_dev, NULL, NULL, true);
+			ii_cnt = ecm_interface_multicast_heirarchy_construct_single(feci, packet_src_addr, packet_dest_addr, ifaces, dest_dev, NULL, NULL, true, layer4hdr);
 			if (ii_cnt == ECM_DB_IFACE_HEIRARCHY_MAX) {
 
 				/*
@@ -2274,7 +2287,8 @@ EXPORT_SYMBOL(ecm_interface_multicast_heirarchy_construct_routed);
 int32_t ecm_interface_multicast_heirarchy_construct_bridged(struct ecm_front_end_connection_instance *feci,
 						     struct ecm_db_iface_instance *interfaces, struct net_device *dest_dev,
 						     ip_addr_t packet_src_addr, ip_addr_t packet_dest_addr, uint8_t mc_max_dst,
-						     int *mc_dst_if_index_base, uint32_t *interface_first_base, uint8_t *src_node_addr)
+						     int *mc_dst_if_index_base, uint32_t *interface_first_base, uint8_t *src_node_addr,
+						     __be16 *layer4hdr)
 {
 	struct ecm_db_iface_instance *to_list_single[ECM_DB_IFACE_HEIRARCHY_MAX];
 	struct ecm_db_iface_instance *ifaces;
@@ -2336,7 +2350,7 @@ int32_t ecm_interface_multicast_heirarchy_construct_bridged(struct ecm_front_end
 		/*
 		 * Construct a single interface heirarchy of a multicast dev.
 		 */
-		ii_cnt = ecm_interface_multicast_heirarchy_construct_single(feci, packet_src_addr, packet_dest_addr, ifaces, dest_dev, mc_br_slave_dev, src_node_addr, false);
+		ii_cnt = ecm_interface_multicast_heirarchy_construct_single(feci, packet_src_addr, packet_dest_addr, ifaces, dest_dev, mc_br_slave_dev, src_node_addr, false, layer4hdr);
 		if (ii_cnt == ECM_DB_IFACE_HEIRARCHY_MAX) {
 
 			/*
@@ -2400,7 +2414,8 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 						int ip_version, int packet_protocol,
 						struct net_device *given_dest_dev,
 						bool is_routed, struct net_device *given_src_dev,
-						uint8_t *dest_node_addr, uint8_t *src_node_addr)
+						uint8_t *dest_node_addr, uint8_t *src_node_addr,
+						__be16 *layer4hdr)
 {
 	int protocol;
 	ip_addr_t src_addr;
@@ -2413,6 +2428,10 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 	int32_t src_dev_type;
 	int32_t current_interface_index;
 	bool from_local_addr;
+	bool next_dest_addr_valid;
+	bool next_dest_node_addr_valid;
+	ip_addr_t next_dest_addr;
+	uint8_t next_dest_node_addr[ETH_ALEN] = {0};
 
 	/*
 	 * Get a big endian of the IPv4 address we have been given as our starting point.
@@ -2474,9 +2493,11 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 			dest_dev = given_dest_dev;
 			if (dest_dev) {
 				dev_hold(dest_dev);
-				DEBUG_TRACE("HACK: %s tunnel packet with dest_addr: " ECM_IP_ADDR_OCTAL_FMT " uses dev: %p(%s)\n",
-						(ip_version == 4) ? "IPV6" : "IPIP",
-						ECM_IP_ADDR_TO_OCTAL(dest_addr), dest_dev, dest_dev->name);
+				if (ip_version == 4) {
+					DEBUG_TRACE("HACK: %s tunnel packet with dest_addr: " ECM_IP_ADDR_DOT_FMT " uses dev: %p(%s)\n", "IPV6", ECM_IP_ADDR_TO_DOT(dest_addr), dest_dev, dest_dev->name);
+				} else {
+					DEBUG_TRACE("HACK: %s tunnel packet with dest_addr: " ECM_IP_ADDR_OCTAL_FMT " uses dev: %p(%s)\n", "IPIP", ECM_IP_ADDR_TO_OCTAL(dest_addr), dest_dev, dest_dev->name);
+				}
 			}
 		}
 	}
@@ -2527,9 +2548,11 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 			src_dev = given_src_dev;
 			if (src_dev) {
 				dev_hold(src_dev);
-				DEBUG_TRACE("HACK: %s tunnel packet with src_addr: " ECM_IP_ADDR_OCTAL_FMT " uses dev: %p(%s)\n",
-						(ip_version == 4) ? "IPV6" : "IPIP",
-						ECM_IP_ADDR_TO_OCTAL(src_addr), src_dev, src_dev->name);
+				if (ip_version == 4) {
+					DEBUG_TRACE("HACK: %s tunnel packet with src_addr: " ECM_IP_ADDR_DOT_FMT " uses dev: %p(%s)\n", "IPV6", ECM_IP_ADDR_TO_DOT(src_addr), src_dev, src_dev->name);
+				} else {
+					DEBUG_TRACE("HACK: %s tunnel packet with src_addr: " ECM_IP_ADDR_OCTAL_FMT " uses dev: %p(%s)\n", "IPIP", ECM_IP_ADDR_TO_OCTAL(src_addr), src_dev, src_dev->name);
+				}
 			}
 		}
 	}
@@ -2567,6 +2590,10 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 			return ECM_DB_IFACE_HEIRARCHY_MAX;
 		}
 	}
+
+	next_dest_addr_valid = true;
+	next_dest_node_addr_valid = false;
+	ECM_IP_ADDR_COPY(next_dest_addr, dest_addr);
 
 	/*
 	 * Iterate until we are done or get to the max number of interfaces we can record.
@@ -2652,17 +2679,10 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 					bool on_link;
 					ip_addr_t gw_addr = ECM_IP_ADDR_NULL;
 					uint8_t mac_addr[ETH_ALEN];
-					if (!ecm_interface_mac_addr_get(dest_addr, mac_addr, &on_link, gw_addr)) {
-						if (ip_version == 4) {
-							DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_DOT_FMT "\n", ECM_IP_ADDR_TO_DOT(dest_addr));
-							ecm_interface_send_arp_request(dest_dev, dest_addr, on_link, gw_addr);
-						}
-#ifdef ECM_IPV6_ENABLE
-						if (ip_version == 6) {
-							DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_OCTAL_FMT "\n", ECM_IP_ADDR_TO_OCTAL(dest_addr));
-							ecm_interface_send_neighbour_solicitation(dest_dev, dest_addr);
-						}
-#endif
+
+					if (next_dest_node_addr_valid) {
+						memcpy(mac_addr, next_dest_node_addr, ETH_ALEN);
+					} else if (!next_dest_addr_valid) {
 						dev_put(src_dev);
 						dev_put(dest_dev);
 
@@ -2671,6 +2691,29 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 						 */
 						ecm_db_connection_interfaces_deref(interfaces, current_interface_index);
 						return ECM_DB_IFACE_HEIRARCHY_MAX;
+					} else {
+						if (!ecm_interface_mac_addr_get(next_dest_addr, mac_addr, &on_link, gw_addr)) {
+							if (ip_version == 4) {
+								DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_DOT_FMT "\n",
+										ECM_IP_ADDR_TO_DOT(dest_addr));
+								ecm_interface_send_arp_request(dest_dev, dest_addr, on_link, gw_addr);
+							}
+#ifdef ECM_IPV6_ENABLE
+							if (ip_version == 6) {
+								DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_OCTAL_FMT "\n",
+										ECM_IP_ADDR_TO_OCTAL(dest_addr));
+								ecm_interface_send_neighbour_solicitation(dest_dev, dest_addr);
+							}
+#endif
+							dev_put(src_dev);
+							dev_put(dest_dev);
+
+							/*
+							 * Release the interfaces heirarchy we constructed to this point.
+							 */
+							ecm_db_connection_interfaces_deref(interfaces, current_interface_index);
+							return ECM_DB_IFACE_HEIRARCHY_MAX;
+						}
 					}
 					next_dev = br_port_dev_get(dest_dev, mac_addr);
 					if (!next_dev) {
@@ -2732,40 +2775,53 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 						/*
 						 * Determine destination MAC address for this routed packet
 						 */
-						if (!ecm_interface_mac_addr_get(dest_addr, dest_mac_addr,
-									&dest_on_link, dest_gw_addr)) {
-
-							/*
-							 * Find proper interfce from which to issue ARP
-							 * or neighbour solicitation packet.
-							 */
-							if (dest_dev_master) {
-								master_dev = dest_dev_master;
-							} else {
-								master_dev = dest_dev;
-							}
-
-							dev_hold(master_dev);
-
+						if (next_dest_node_addr_valid) {
+							memcpy(dest_mac_addr, next_dest_node_addr, ETH_ALEN);
+						} else if (!next_dest_addr_valid) {
+							dev_put(src_dev);
+							dev_put(dest_dev);
 							if (dest_dev_master) {
 								dev_put(dest_dev_master);
 							}
 
-							if (ip_version == 4) {
-								DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_DOT_FMT "\n", ECM_IP_ADDR_TO_DOT(dest_addr));
-								ecm_interface_send_arp_request(dest_dev, dest_addr, dest_on_link, dest_gw_addr);
-							}
-#ifdef ECM_IPV6_ENABLE
-							if (ip_version == 6) {
-								DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_OCTAL_FMT "\n",ECM_IP_ADDR_TO_OCTAL(dest_addr));
-								ecm_interface_send_neighbour_solicitation(master_dev, dest_addr);
-							}
-#endif
-							dev_put(src_dev);
-							dev_put(dest_dev);
-							dev_put(master_dev);
 							ecm_db_connection_interfaces_deref(interfaces, current_interface_index);
 							return ECM_DB_IFACE_HEIRARCHY_MAX;
+						} else {
+							if (!ecm_interface_mac_addr_get(dest_addr, dest_mac_addr,
+										&dest_on_link, dest_gw_addr)) {
+
+								/*
+								 * Find proper interfce from which to issue ARP
+								 * or neighbour solicitation packet.
+								 */
+								if (dest_dev_master) {
+									master_dev = dest_dev_master;
+								} else {
+									master_dev = dest_dev;
+								}
+
+								dev_hold(master_dev);
+
+								if (dest_dev_master) {
+									dev_put(dest_dev_master);
+								}
+
+								if (ip_version == 4) {
+									DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_DOT_FMT "\n", ECM_IP_ADDR_TO_DOT(dest_addr));
+									ecm_interface_send_arp_request(dest_dev, dest_addr, dest_on_link, dest_gw_addr);
+								}
+#ifdef ECM_IPV6_ENABLE
+								if (ip_version == 6) {
+									DEBUG_WARN("Unable to obtain MAC address for " ECM_IP_ADDR_OCTAL_FMT "\n",ECM_IP_ADDR_TO_OCTAL(dest_addr));
+									ecm_interface_send_neighbour_solicitation(master_dev, dest_addr);
+								}
+#endif
+								dev_put(src_dev);
+								dev_put(dest_dev);
+								dev_put(master_dev);
+								ecm_db_connection_interfaces_deref(interfaces, current_interface_index);
+								return ECM_DB_IFACE_HEIRARCHY_MAX;
+							}
 						}
 
 						if (dest_dev_master) {
@@ -2776,11 +2832,11 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 					if (ip_version == 4) {
 						next_dev = bond_get_tx_dev(NULL, src_mac_addr, dest_mac_addr,
 										&src_addr_32, &dest_addr_32,
-										htons((uint16_t)ETH_P_IP), dest_dev);
+										htons((uint16_t)ETH_P_IP), dest_dev, layer4hdr);
 					} else if (ip_version == 6) {
 						next_dev = bond_get_tx_dev(NULL, src_mac_addr, dest_mac_addr,
 										src_addr, dest_addr,
-										htons((uint16_t)ETH_P_IPV6), dest_dev);
+										htons((uint16_t)ETH_P_IPV6), dest_dev, NULL);
 					}
 
 					if (next_dev && netif_carrier_ok(next_dev)) {
@@ -2909,6 +2965,9 @@ int32_t ecm_interface_heirarchy_construct(struct ecm_front_end_connection_instan
 			 * Copy the dev hold into this, we will release the hold later
 			 */
 			next_dev = addressing.dev;
+			next_dest_addr_valid = false;
+			next_dest_node_addr_valid = true;
+			memcpy(next_dest_node_addr, addressing.pa.remote, ETH_ALEN);
 
 			DEBUG_TRACE("Net device: %p, next device: %p (%s)\n", dest_dev, next_dev, next_dev->name);
 
@@ -3189,7 +3248,11 @@ void ecm_interface_regenerate_connection(struct ecm_db_connection_instance *ci)
 static void ecm_interface_regenerate_connections(struct ecm_db_iface_instance *ii)
 {
 #ifdef ECM_DB_XREF_ENABLE
-	struct ecm_db_connection_instance *ci;
+	struct ecm_db_connection_instance *ci_from;
+	struct ecm_db_connection_instance *ci_to;
+	struct ecm_db_connection_instance *ci_from_nat;
+	struct ecm_db_connection_instance *ci_to_nat;
+	struct ecm_db_connection_instance *ci_mcast __attribute__ ((unused));
 #endif
 
 	DEBUG_TRACE("Regenerate connections using interface: %p\n", ii);
@@ -3201,60 +3264,93 @@ static void ecm_interface_regenerate_connections(struct ecm_db_iface_instance *i
 	ecm_db_regeneration_needed();
 #else
 	/*
-	 * Iterate the connections of this interface and cause each one to be re-generated.
-	 * GGG TODO NOTE: If this proves slow (need metrics here) we could just regenerate the "lot" with one very simple call.
-	 * But this would cause re-gen of every connection which may not be appropriate, this here at least keeps things in scope of the interface
-	 * but at the cost of performance.
+	 * If the interface has NO connections then we re-generate all.
+	 */
+	ci_from = ecm_db_iface_connections_from_get_and_ref_first(ii);
+	ci_to = ecm_db_iface_connections_to_get_and_ref_first(ii);
+	ci_from_nat = ecm_db_iface_connections_nat_from_get_and_ref_first(ii);
+	ci_to_nat = ecm_db_iface_connections_nat_to_get_and_ref_first(ii);
+	if (!ci_from && !ci_to && !ci_from_nat && !ci_to_nat) {
+		ecm_db_regeneration_needed();
+		DEBUG_TRACE("%p: Regenerate (ALL) COMPLETE\n", ii);
+		return;
+	}
+
+	/*
+	 * Re-generate all connections associated with this interface
 	 */
 	DEBUG_TRACE("%p: Regenerate 'from' connections\n", ii);
-	ci = ecm_db_iface_connections_from_get_and_ref_first(ii);
-	while (ci) {
+	while (ci_from) {
 		struct ecm_db_connection_instance *cin;
-		cin = ecm_db_connection_iface_from_get_and_ref_next(ci);
+		cin = ecm_db_connection_iface_from_get_and_ref_next(ci_from);
 
-		DEBUG_TRACE("%p: Regenerate: %p", ii, ci);
-		ecm_db_connection_regeneration_needed(ci);
-		ecm_db_connection_deref(ci);
-		ci = cin;
+		DEBUG_TRACE("%p: Regenerate: %p", ii, ci_from);
+		ecm_db_connection_regeneration_needed(ci_from);
+		ecm_db_connection_deref(ci_from);
+		ci_from = cin;
 	}
 
 	DEBUG_TRACE("%p: Regenerate 'to' connections\n", ii);
-	ci = ecm_db_iface_connections_to_get_and_ref_first(ii);
-	while (ci) {
+	while (ci_to) {
 		struct ecm_db_connection_instance *cin;
-		cin = ecm_db_connection_iface_to_get_and_ref_next(ci);
+		cin = ecm_db_connection_iface_to_get_and_ref_next(ci_to);
 
-		DEBUG_TRACE("%p: Regenerate: %p", ii, ci);
-		ecm_db_connection_regeneration_needed(ci);
-		ecm_db_connection_deref(ci);
-		ci = cin;
+		DEBUG_TRACE("%p: Regenerate: %p", ii, ci_to);
+		ecm_db_connection_regeneration_needed(ci_to);
+		ecm_db_connection_deref(ci_to);
+		ci_to = cin;
 	}
 
+	/*
+	 * GGG TODO These deprecated lists _nat_ lists will eventually be removed
+	 */
 	DEBUG_TRACE("%p: Regenerate 'from_nat' connections\n", ii);
-	ci = ecm_db_iface_connections_nat_from_get_and_ref_first(ii);
-	while (ci) {
+	while (ci_from_nat) {
 		struct ecm_db_connection_instance *cin;
-		cin = ecm_db_connection_iface_nat_from_get_and_ref_next(ci);
+		cin = ecm_db_connection_iface_nat_from_get_and_ref_next(ci_from_nat);
 
-		DEBUG_TRACE("%p: Regenerate: %p", ii, ci);
-		ecm_db_connection_regeneration_needed(ci);
-		ecm_db_connection_deref(ci);
-		ci = cin;
+		DEBUG_TRACE("%p: Regenerate: %p", ii, ci_from_nat);
+		ecm_db_connection_regeneration_needed(ci_from_nat);
+		ecm_db_connection_deref(ci_from_nat);
+		ci_from_nat = cin;
 	}
 
 	DEBUG_TRACE("%p: Regenerate 'to_nat' connections\n", ii);
-	ci = ecm_db_iface_connections_nat_to_get_and_ref_first(ii);
-	while (ci) {
+	while (ci_to_nat) {
 		struct ecm_db_connection_instance *cin;
-		cin = ecm_db_connection_iface_nat_to_get_and_ref_next(ci);
+		cin = ecm_db_connection_iface_nat_to_get_and_ref_next(ci_to_nat);
 
-		DEBUG_TRACE("%p: Regenerate: %p", ii, ci);
-		ecm_db_connection_regeneration_needed(ci);
-		ecm_db_connection_deref(ci);
-		ci = cin;
+		DEBUG_TRACE("%p: Regenerate: %p", ii, ci_to_nat);
+		ecm_db_connection_regeneration_needed(ci_to_nat);
+		ecm_db_connection_deref(ci_to_nat);
+		ci_to_nat = cin;
+	}
+
+#ifdef ECM_MULTICAST_ENABLE
+	/*
+	 * Multicasts would not have recorded in the lists above.
+	 * Our only way to re-gen those is to iterate all multicasts.
+	 * GGG TODO This will be optimised in a future release.
+	 */
+	ci_mcast = ecm_db_connections_get_and_ref_first();
+	while (ci_mcast) {
+		struct ecm_db_connection_instance *cin;
+
+		/*
+		 * Multicast and NOT flagged for re-gen?
+		 */
+		if (ecm_db_multicast_connection_to_interfaces_set_check(ci_mcast)
+				&& ecm_db_connection_regeneration_required_peek(ci_mcast)) {
+			ecm_db_connection_regeneration_needed(ci_mcast);
+		}
+
+		cin = ecm_db_connection_get_and_ref_next(ci_mcast);
+		ecm_db_connection_deref(ci_mcast);
+		ci_mcast = cin;
 	}
 #endif
 
+#endif
 	DEBUG_TRACE("%p: Regenerate COMPLETE\n", ii);
 }
 

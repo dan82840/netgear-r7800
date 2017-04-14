@@ -719,7 +719,7 @@ void ecm_nss_ipv6_connection_regenerate(struct ecm_db_connection_instance *ci, e
 	feci = ecm_db_connection_front_end_get_and_ref(ci);
 
 	DEBUG_TRACE("%p: Update the 'from' interface heirarchy list\n", ci);
-	from_list_first = ecm_interface_heirarchy_construct(feci, from_list, ip_dest_addr, ip_src_addr, 6, protocol, in_dev, is_routed, in_dev, src_node_addr, dest_node_addr);
+	from_list_first = ecm_interface_heirarchy_construct(feci, from_list, ip_dest_addr, ip_src_addr, 6, protocol, in_dev, is_routed, in_dev, src_node_addr, dest_node_addr, NULL);
 	if (from_list_first == ECM_DB_IFACE_HEIRARCHY_MAX) {
 		goto ecm_ipv6_retry_regen;
 	}
@@ -728,7 +728,7 @@ void ecm_nss_ipv6_connection_regenerate(struct ecm_db_connection_instance *ci, e
 	ecm_db_connection_interfaces_deref(from_list, from_list_first);
 
 	DEBUG_TRACE("%p: Update the 'to' interface heirarchy list\n", ci);
-	to_list_first = ecm_interface_heirarchy_construct(feci, to_list, ip_src_addr, ip_dest_addr, 6, protocol, out_dev, is_routed, in_dev, dest_node_addr, src_node_addr);
+	to_list_first = ecm_interface_heirarchy_construct(feci, to_list, ip_src_addr, ip_dest_addr, 6, protocol, out_dev, is_routed, in_dev, dest_node_addr, src_node_addr, NULL);
 	if (to_list_first == ECM_DB_IFACE_HEIRARCHY_MAX) {
 		goto ecm_ipv6_retry_regen;
 	}
@@ -948,7 +948,6 @@ static unsigned int ecm_nss_ipv6_ip_process(struct net_device *out_dev, struct n
 				ECM_IP_ADDR_TO_OCTAL(ip_src_addr),
 				ECM_IP_ADDR_TO_OCTAL(ip_dest_addr),
 				orig_tuple.dst.protonum, sender, ecm_dir);
-
 	/*
 	 * Non-unicast source or destination packets are ignored
 	 * NOTE: Only need to check the non-nat src/dest addresses here.
@@ -2248,11 +2247,6 @@ int ecm_nss_ipv6_init(struct dentry *dentry)
 	}
 #endif
 
-	if (!ecm_nss_ipv6_sync_queue_init()) {
-		DEBUG_ERROR("Failed to create ecm ipv6 connection sync workqueue\n");
-		goto task_cleanup;
-	}
-
 #ifdef ECM_MULTICAST_ENABLE
 	if (!ecm_nss_multicast_ipv6_debugfs_init(ecm_nss_ipv6_dentry)) {
 		DEBUG_ERROR("Failed to create ecm multicast files in debugfs\n");
@@ -2277,6 +2271,17 @@ int ecm_nss_ipv6_init(struct dentry *dentry)
 	 * Register this module with the Linux NSS Network driver
 	 */
 	ecm_nss_ipv6_nss_ipv6_mgr = nss_ipv6_notify_register(ecm_nss_ipv6_net_dev_callback, NULL);
+
+	if (!ecm_nss_ipv6_sync_queue_init()) {
+		DEBUG_ERROR("Failed to create ecm ipv6 connection sync workqueue\n");
+		nss_ipv6_notify_unregister();
+#ifdef ECM_MULTICAST_ENABLE
+		ecm_nss_multicast_ipv6_exit();
+#endif
+		nf_unregister_hooks(ecm_nss_ipv6_netfilter_hooks,
+				ARRAY_SIZE(ecm_nss_ipv6_netfilter_hooks));
+		goto task_cleanup;
+	}
 
 	return 0;
 

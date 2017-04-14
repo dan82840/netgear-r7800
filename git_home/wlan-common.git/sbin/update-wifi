@@ -557,6 +557,28 @@ generate_bf()
     fi
 }
 
+#
+# Generate "wireless.<DEVICE>.mu_mimo" in /etc/config/wireless
+#
+# Used variable in etc/dni-wifi-config: wla_mu_mimo_onoff
+#
+# $1: "wla" when device is 5 GHz
+#
+generate_mu_mimo()
+{
+    eval wl_mu_mimo_onoff=\$`echo $1`_mu_mimo_onoff
+
+    if [ "$wl_mu_mimo_onoff" = "on" ]; then
+        wl_mu_mimo_value=1
+    elif [ "$wl_mu_mimo_onoff" = "off" ]; then
+        wl_mu_mimo_value=0
+    fi
+
+    if [ "$1" = "wla" ]; then
+        uci set wireless.${a_device}.mu_mimo=${wl_mu_mimo_value}
+    fi
+}
+
 # config driver parameters
 uci set wireless.qcawifi=qcawifi
 uci set wireless.qcawifi.wl_super_wifi=${wl_super_wifi}
@@ -594,6 +616,7 @@ if [ "$wla_exist" = "on" ]; then
     generate_htmode "wla"
     generate_tpscale "wla"
     generate_bf "wla"
+    generate_mu_mimo "wla"
 fi
 
 get_intf_onoff _tmp_wlg_onoff "wlg"

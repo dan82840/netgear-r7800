@@ -97,6 +97,7 @@ var dyn_get_dns_flag="<% cfg_get("ap_ether_dns_assign") %>";
 var wl_disablecoext="<% cfg_get("wl_disablecoext") %>";
 var endis_beamforming = "<% cfg_get("wla_bf") %>";
 var enable_ht160 = "<% cfg_get("wla_ht160") %>";
+var enable_mu="<% cfg_get("wla_mu_mimo") %>";
 
 var super_wifi_value="<% cfg_get("wl_super_wifi") %>";
 var super_wifi_value_an="<% cfg_get("wla_super_wifi") %>";
@@ -104,11 +105,29 @@ var super_wifi_value_an="<% cfg_get("wla_super_wifi") %>";
 function power_display()
 {
 	var form = document.forms[0];
-	if(form.enable_beamform.checked == false && country != "11")
-		document.getElementById("power_ctrl_an").style.display="";
-	if(form.enable_beamform.checked == true)
-		document.getElementById("power_ctrl_an").style.display="none";
-			
+	if( qtn_api_statistics_flag == 1 )
+	{
+		if(form.enable_beamform.checked == false && country != "11")
+			document.getElementById("power_ctrl_an").style.display="";
+		if(form.enable_beamform.checked == true)
+			document.getElementById("power_ctrl_an").style.display="none";
+	}
+	if(form.enable_beamform.checked)
+	{
+		getObj('wladv_mu').color = 'black';
+		form.enable_mu.disabled = false;
+		if(enable_mu == "1")
+			form.enable_mu.checked = true;
+		else
+			form.enable_mu.checked = false;
+	}
+	else
+	{
+		getObj('wladv_mu').color = 'gray';
+		form.enable_mu.disabled = true;
+		form.enable_mu.checked = false;
+	}
+	
 }
 
 function wps_protection_display()
@@ -430,6 +449,7 @@ function loadvalue()
 		form.enable_beamform.checked = true;
 	else
 		form.enable_beamform.checked = false;	
+	power_display();
 
 	if((wlendis_pin == '1') || (wlendis_pin_tmp == '1'))
 	{
@@ -549,6 +569,7 @@ function transmit_select_an(form)
 <input type="hidden" name="wladv_schedule_delete_num" value="">
 <input type="hidden" name="hid_enable_coexist">
 <input type="hidden" name="hid_wla_beamforming">
+<input type="hidden" name="hid_wla_mu_mimo" value="0">
 <input type="hidden" name="hid_wla_ht160">
 <TR>
 	<TD nowrap colspan=2>
@@ -870,15 +891,14 @@ $bluebar
 </TR>
 <TR><TD>&nbsp;</TD></TR>
 $bluebar
-<TR><TD nowrap><B>Expertise</B></TD></TR>
 <TR id='wladv_beamforming'>
 	<TD nowrap colspan=2 >
-	<script>
-	if( qtn_api_statistics_flag == 1 )
-		document.write('<input type="checkbox" name="enable_beamform"  onclick="power_display()" value=0>$enable_beamform');
-	else
-		document.write('<input type="checkbox" name="enable_beamform"  value=0>$enable_beamform');
-	</script>
+	<input type="checkbox" name="enable_beamform"  onclick="power_display()" value="">$enable_beamform1');
+	</TD>
+</TR>
+<TR id='wladv_mu'>
+	<TD nowrap colspan=2 >
+	<input type="checkbox" name="enable_mu" value="">$enable_mu
 	</TD>
 </TR>
 <TR id='wladv_ht160'>

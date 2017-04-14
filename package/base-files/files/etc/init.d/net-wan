@@ -8,10 +8,6 @@ check_qca_nss() {
 	proto=$1
 	if [ "$proto" = "pptp" ] || [ "$proto" = "l2tp" ] || [ "$($CONFIG get qos_endis_on)" = "1" ] ; then
 		/etc/init.d/qca-nss-ecm stop &
-	elif [ "$($CONFIG get streamboost_enable)" = "1" ] && [ "$proto" = "dhcp" ]; then
-		/etc/init.d/qca-nss-ecm stop &
-	elif [ "$($CONFIG get streamboost_enable)" = "1" ] && [ "$proto" = "static" ]; then
-		/etc/init.d/qca-nss-ecm stop &
 	else
 		pppmod=`lsmod |grep pppoe`
 		[ "x$pppmod" = "x" ] && insmod pppox && insmod pppoe

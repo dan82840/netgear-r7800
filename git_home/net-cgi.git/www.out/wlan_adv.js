@@ -176,9 +176,13 @@ function checkadv(form)
 	else
 		form.endis_wsc_config_a.value="1";*/ //for 28582 missed. so show 38104 bug.
 	if(form.enable_beamform.checked ==  true)
+	{
 		form.hid_wla_beamforming.value = "1";
+		form.hid_wla_mu_mimo.value = form.enable_mu.checked? "1": "0";
+	}
 	else
 		form.hid_wla_beamforming.value = "0";
+		
 	if(form.enable_ht160.checked == true)
 		form.hid_wla_ht160.value = "1";
 	else

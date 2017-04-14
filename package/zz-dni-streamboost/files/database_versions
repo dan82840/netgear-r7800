@@ -1,5 +1,5 @@
 Package: wopr-db
-Version: 20150330105440-g60029a7-generic-1
+Version: 20150813165303-gea65011-generic
 Depends: libc
 Provides:
 Status: install ok installed

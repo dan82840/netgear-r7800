@@ -26,7 +26,7 @@ define Package/app-flow-scripts/Default
   CATEGORY:=Bigfoot
   SUBMENU:=Flow Detect
   TITLE:=Bigfoot Networks App Detect Scripts
-  DEPENDS:=+drflocs +p0f +ubus +libubox +monit
+  DEPENDS:=+drflocs +p0f +ubus +libubox
   MAINTAINER:=Cristian Prundeanu <prundeanu@qca.qualcomm.com>
 endef
 

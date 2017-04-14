@@ -8,8 +8,8 @@ PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/local-development.mk
 ifeq ($(DUMP)$(PKG_VERSION),)
-PKG_REV:=dc71d16
-PKG_VERSION:=gdc71d16
+PKG_REV:=a5a315d
+PKG_VERSION:=ga5a315d
 endif
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
